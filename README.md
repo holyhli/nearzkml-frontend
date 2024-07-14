@@ -13,3 +13,4 @@ We bring ZKML to Near Protocol, and we are looking for support to make it happen
 - [ZKML Near Oracle Smart Contract](https://github.com/holyhli/zkml-near-oracle-smart-contract)
 - [NearZKML ezkl](https://github.com/holyhli/nearzkml-backend)
 - [NearZKML Oracle Backend](https://github.com/holyhli/nearzkml-oracle-backend)
+- [NearZKML Presentation](https://docs.google.com/presentation/d/1iV8IOsQXf5WsC642HakZIAWbEFPQiXgF/edit#slide=id.p1)
