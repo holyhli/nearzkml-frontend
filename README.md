@@ -6,6 +6,8 @@ Using ZKML makes using AI on-chain SAFE. Instead of common-practice Oracles, we 
 
 Imagine the risks that DEX/DEFI could have without ZKML while using Oracles, hundreds of billions of dollars each year.
 
+We bring ZKML to Near Protocol, and we are looking for support to make it happen.
+
 ## Links to Other Parts of Our Submission
 
 - [ZKML Near Oracle Smart Contract](https://github.com/holyhli/zkml-near-oracle-smart-contract)
