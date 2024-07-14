@@ -37,20 +37,79 @@ function App() {
   const [proof, setProof] = useState('');
   const [verifyDisabled, setVerifyDisabled] = useState(true);
   const [verifyLoading, setVerifyLoading] = useState(false);
+  const [expectedStructure, setExpectedStructure] = useState(null);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleModelChange = (event) => {
     setSelectedModel(event.target.value);
   };
 
+  console.log("expectedStructure", expectedStructure);
+
   const handleInputChange = (event) => {
     setInputData(event.target.value);
   };
 
-  const handleSubmit = () => {
+  async function generateProof(inputData, modelName) {
+    const url = `http://0.0.0.0:8000/generate-proof?model_name=${encodeURIComponent(modelName)}`;
+    const requestBody = {
+      input_data: inputData
+    };
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+
+        console.log("errorData.details", errorData.detail);
+        if (errorData.detail) {
+          const expected_structure = errorData.detail.details.expected_structure;
+          console.error('Invalid input structure:', expected_structure);
+          setExpectedStructure(expected_structure);
+        }
+
+        throw new Error(errorData.detail || 'Error generating proof');
+      }
+
+      const data = await response.json();
+      return data.proof;
+    } catch (error) {
+      console.error('Error:', error);
+      if (error.detail && error.detail.details.expected_structure) {
+        setExpectedStructure(error.detail.details.expected_structure);
+      }
+      return 'Error generating proof';
+    }
+  }
+
+  function normalizeInputData(input) {
+    return input
+        .trim()
+        .replace(/^\\+"|\\+"$/g, '') // Remove surrounding escaped quotes
+        .replace(/\\+/g, '') // Remove remaining backslashes
+        .replace(/\s+/g, ''); // Remove whitespace
+  }
+
+  const handleSubmit = async () => {
     setLoading(true);
     setVerify(false);
     setProof('');
     setVerifyDisabled(true);
+    setExpectedStructure(null);
+
+    console.log("inputData", inputData);
+
+    const normalizedInputData = normalizeInputData(inputData);
+    const proof = await generateProof(normalizedInputData, selectedModel);
+    console.log('Proof generated:', proof);
+
     setTimeout(() => {
       setLoading(false);
       setVerifyDisabled(false);
@@ -71,7 +130,7 @@ function App() {
   return (
       <div
           className="App min-h-screen bg-cover bg-center flex flex-col items-center justify-center p-4"
-          style={ { backgroundImage: "url('https://source.unsplash.com/1600x900/?ai,technology')" } }
+          style={{ backgroundImage: "url('https://source.unsplash.com/1600x900/?ai,technology')" }}
       >
         <h1 className="text-4xl font-bold text-white mb-6">Select Model and Input Data</h1>
         <div className="mb-4 w-full max-w-md">
@@ -81,18 +140,18 @@ function App() {
           >Select Model:</label>
           <select
               id="model-selector"
-              value={ selectedModel }
-              onChange={ handleModelChange }
+              value={selectedModel}
+              onChange={handleModelChange}
               className="block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
           >
-            { models.map((model) => (
+            {models.map((model) => (
                 <option
-                    key={ model }
-                    value={ model }
+                    key={model}
+                    value={model}
                 >
-                  { model }
+                  {model}
                 </option>
-            )) }
+            ))}
           </select>
         </div>
         <div className="mb-4 w-full max-w-md">
@@ -100,20 +159,20 @@ function App() {
               htmlFor="model-input"
               className="block text-lg font-medium text-white mb-2"
           >Input Data:</label>
-          <input
-              id="model-input"
-              type="text"
-              value={ inputData }
-              onChange={ handleInputChange }
-              className="block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+          <textarea
+            id="model-input"
+            value={inputData}
+            onChange={handleInputChange}
+            className="block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+            rows="10"
           />
         </div>
         <button
-            onClick={ handleSubmit }
+            onClick={handleSubmit}
             className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-md shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-            disabled={ loading }
+            disabled={loading}
         >
-          { loading ? (
+          {loading ? (
               <svg
                   className="animate-spin h-5 w-5 text-white"
                   xmlns="http://www.w3.org/2000/svg"
@@ -136,20 +195,20 @@ function App() {
               </svg>
           ) : (
               'Submit'
-          ) }
+          )}
         </button>
         <button
-            onClick={ handleVerify }
-            className={ classNames(
+            onClick={handleVerify}
+            className={classNames(
                 "mt-4 px-6 py-3 font-semibold rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2",
                 {
                   "bg-green-600 text-white hover:bg-green-700 focus:ring-green-500": !verifyDisabled,
                   "bg-gray-400 text-gray-700 cursor-not-allowed": verifyDisabled,
                 }
-            ) }
-            disabled={ verifyDisabled || verifyLoading }
+            )}
+            disabled={verifyDisabled || verifyLoading}
         >
-          { verifyLoading ? (
+          {verifyLoading ? (
               <svg
                   className="animate-spin h-5 w-5 text-white"
                   xmlns="http://www.w3.org/2000/svg"
@@ -172,23 +231,27 @@ function App() {
               </svg>
           ) : (
               'Verify Proof'
-          ) }
+          )}
         </button>
         <div className="mt-6 text-white flex flex-col items-center space-y-4">
           <div className="flex items-center space-x-2">
             <FaCogs className="text-2xl" />
-            <h2 className="text-2xl font-semibold">Selected Model: { selectedModel }</h2>
+            <h2 className="text-2xl font-semibold">Selected Model: {selectedModel}</h2>
           </div>
-          <div className="flex items-center space-x-2">
-            <FaKeyboard className="text-2xl" />
-            <h2 className="text-2xl font-semibold">Input Data: { inputData }</h2>
-          </div>
-          { verify && (
+          {verify && (
               <div className="flex items-center space-x-2">
                 <FaCheckCircle className="text-2xl" />
-                <h2 className="text-2xl font-semibold">Proof: { proof }</h2>
+                <h2 className="text-2xl font-semibold">Proof: {proof}</h2>
               </div>
-          ) }
+          )}
+          {expectedStructure && (
+              <div className="mt-4 p-4 bg-gray-800 rounded-md">
+                <h3 className="text-xl font-semibold">Expected Structure:</h3>
+                <pre className="bg-gray-900 p-2 rounded-md overflow-x-auto">
+              {JSON.stringify(expectedStructure, null, 2)}
+            </pre>
+              </div>
+          )}
         </div>
       </div>
   );
