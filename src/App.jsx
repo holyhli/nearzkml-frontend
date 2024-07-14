@@ -2,6 +2,7 @@ import { useState } from 'react';
 import './App.css';
 import 'tailwindcss/tailwind.css';
 import classNames from "classnames";
+import { modelDescriptions } from "./constants";
 import { FaCheckCircle } from 'react-icons/fa';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { dark } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -32,7 +33,7 @@ const models = [
 ];
 
 function App() {
-  const [selectedModel, setSelectedModel] = useState(models[0]);
+  const [selectedModelIndex, setSelectedModelIndex] = useState(models[0]);
   const [inputData, setInputData] = useState('');
   const [loading, setLoading] = useState(false);
   const [verify, setVerify] = useState(false);
@@ -44,11 +45,9 @@ function App() {
   const [output, setOutput] = useState('');
 
   const handleModelChange = (event) => {
-    setSelectedModel(event.target.value);
+    setSelectedModelIndex(event.target.value);
     fetchInputExample(event.target.value);
   };
-
-  console.log("expectedStructure", expectedStructure);
 
   const handleInputChange = (event) => {
     setInputData(event.target.value);
@@ -72,7 +71,6 @@ function App() {
       if (!response.ok) {
         const errorData = await response.json();
 
-        console.log("errorData.details", errorData.detail);
         if (errorData.detail) {
           const expected_structure = errorData.detail.details.expected_structure;
           console.error('Invalid input structure:', expected_structure);
@@ -95,18 +93,16 @@ function App() {
     }
   }
 
-  async function fetchInputExample(modelName) {
+  async function fetchInputExample(modelIndex) {
     try {
-      const response = await fetch(`http://localhost:8000/input-example?model_name=${modelName}`);
+      const response = await fetch(`http://localhost:8000/input-example?model_name=${models[modelIndex]}`);
       if (!response.ok) {
         const errorDetails = await response.json();
         throw new Error(`Error: ${errorDetails.detail}`);
       }
 
       const data = await response.json();
-      console.log("data", data);
       setExpectedStructure(data)
-      console.log('Input Example:', data);
     } catch (error) {
       console.error('Failed to fetch input example:', error);
     }
@@ -128,13 +124,11 @@ function App() {
     setExpectedStructure(null);
 
     const normalizedInputData = normalizeInputData(inputData);
-    const proof = await generateProof(normalizedInputData, selectedModel);
-    console.log('Proof generated:', proof);
+    const proof = await generateProof(normalizedInputData, models[selectedModelIndex]);
 
     setOutput(proof.pretty_public_inputs.rescaled_outputs);
     setLoading(false);
     setVerifyDisabled(false);
-    console.log(`Model: ${selectedModel}, Input: ${inputData}`);
   };
 
   const handleVerify = () => {
@@ -160,19 +154,27 @@ function App() {
           >Select Model:</label>
           <select
               id="model-selector"
-              value={ selectedModel }
-              onChange={ handleModelChange }
+              value={selectedModelIndex}
+              onChange={handleModelChange}
               className="block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
           >
-            { models.map((model) => (
+            {models.map((model, index) => (
                 <option
-                    key={ model }
-                    value={ model }
+                    key={model}
+                    value={index}
                 >
-                  { model }
+                  {model}
                 </option>
-            )) }
+            ))}
           </select>
+          {modelDescriptions[selectedModelIndex] && (
+              <div className="mt-4 p-4 bg-gray-800 rounded-md text-white">
+                <h3 className="text-xl font-semibold mb-2">{modelDescriptions[selectedModelIndex].name}</h3>
+                <p><strong>Purpose:</strong> {modelDescriptions[selectedModelIndex].purpose}</p>
+                <p><strong>Usage:</strong> {modelDescriptions[selectedModelIndex].usage}</p>
+                <p><strong>How to Use:</strong> {modelDescriptions[selectedModelIndex].howToUse}</p>
+              </div>
+          )}
         </div>
         <div className="mb-4 w-full max-w-md">
           <label
@@ -190,94 +192,104 @@ function App() {
               <p className="text-red-500 mt-2">{ errorMessage }</p>
           ) }
         </div>
-        <button
-            onClick={ handleSubmit }
-            className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-md shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-            disabled={ loading }
-        >
-          { loading ? (
-              <svg
-                  className="animate-spin h-5 w-5 text-white"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-              >
-                <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                ></circle>
-                <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                ></path>
-              </svg>
-          ) : (
-              'Submit'
-          ) }
-        </button>
-        <button
-            onClick={ handleVerify }
-            className={ classNames(
-                "mt-4 px-6 py-3 font-semibold rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2",
-                {
-                  "bg-green-600 text-white hover:bg-green-700 focus:ring-green-500": !verifyDisabled,
-                  "bg-gray-400 text-gray-700 cursor-not-allowed": verifyDisabled,
-                }
+        <div>
+          <button
+              onClick={ handleSubmit }
+              className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-md shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+              disabled={ loading }
+          >
+            { loading ? (
+                <svg
+                    className="animate-spin h-5 w-5 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                >
+                  <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                  ></circle>
+                  <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  ></path>
+                </svg>
+            ) : (
+                'Submit'
             ) }
-            disabled={ verifyDisabled || verifyLoading }
-        >
-          { verifyLoading ? (
-              <svg
-                  className="animate-spin h-5 w-5 text-white"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-              >
-                <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                ></circle>
-                <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                ></path>
-              </svg>
-          ) : (
-              'Verify Proof'
-          ) }
-        </button>
+          </button>
+          <button
+              onClick={ handleVerify }
+              className={ classNames(
+                  "mt-4 ml-4 px-6 py-3 font-semibold rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2",
+                  {
+                    "bg-green-600 text-white hover:bg-green-700 focus:ring-green-500": !verifyDisabled,
+                    "bg-gray-400 text-gray-700 cursor-not-allowed": verifyDisabled,
+                  }
+              ) }
+              disabled={ verifyDisabled || verifyLoading }
+          >
+            { verifyLoading ? (
+                <svg
+                    className="animate-spin h-5 w-5 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                >
+                  <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                  ></circle>
+                  <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  ></path>
+                </svg>
+            ) : (
+                'Verify Proof'
+            ) }
+          </button>
+        </div>
+        { verify && (
+            <div className="flex mt-4 items-center space-x-2">
+              <FaCheckCircle className="text-2xl" />
+              <h2 className="text-2xl font-semibold">Proof: { proof }</h2>
+            </div>
+        ) }
         { output && (
             <div className="mt-4 p-6 bg-gray-800 rounded-md w-full max-w-3xl">
               <h3 className="text-xl font-semibold text-white mb-4">Output:</h3>
-              <SyntaxHighlighter language="json" style={dark} className="rounded-md overflow-x-auto">
+              <SyntaxHighlighter
+                  language="json"
+                  style={ dark }
+                  className="rounded-md overflow-x-auto"
+              >
                 { JSON.stringify(output, null, 2) }
               </SyntaxHighlighter>
             </div>
         ) }
         <div className="mt-6 text-white flex flex-col items-center space-y-4">
-          { verify && (
-              <div className="flex items-center space-x-2">
-                <FaCheckCircle className="text-2xl" />
-                <h2 className="text-2xl font-semibold">Proof: { proof }</h2>
-              </div>
-          ) }
           { expectedStructure && (
-            <div className="mt-4 p-6 bg-gray-800 rounded-md w-full max-w-3xl">
-              <h3 className="text-xl font-semibold text-white mb-4">Expected Structure:</h3>
-              <SyntaxHighlighter language="javascript" style={dark} className="rounded-md overflow-x-auto">
-                { JSON.stringify(expectedStructure, null, 2) }
-              </SyntaxHighlighter>
-            </div>
+              <div className="mt-4 p-6 bg-gray-800 rounded-md w-full max-w-3xl">
+                <h3 className="text-xl font-semibold text-white mb-4">Expected Structure:</h3>
+                <SyntaxHighlighter
+                    language="javascript"
+                    style={ dark }
+                    className="rounded-md overflow-x-auto"
+                >
+                  { JSON.stringify(expectedStructure, null, 2) }
+                </SyntaxHighlighter>
+              </div>
           ) }
         </div>
       </div>
