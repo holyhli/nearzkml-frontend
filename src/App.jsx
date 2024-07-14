@@ -2,7 +2,9 @@ import { useState } from 'react';
 import './App.css';
 import 'tailwindcss/tailwind.css';
 import classNames from "classnames";
-import { FaCogs, FaKeyboard, FaCheckCircle } from 'react-icons/fa';
+import { FaCheckCircle } from 'react-icons/fa';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { dark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 const models = [
   '1l_average', '1l_powf', 'accuracy', 'layernorm', 'quantize_dequantize',
@@ -39,9 +41,11 @@ function App() {
   const [verifyLoading, setVerifyLoading] = useState(false);
   const [expectedStructure, setExpectedStructure] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
+  const [output, setOutput] = useState('');
 
   const handleModelChange = (event) => {
     setSelectedModel(event.target.value);
+    fetchInputExample(event.target.value);
   };
 
   console.log("expectedStructure", expectedStructure);
@@ -73,9 +77,10 @@ function App() {
           const expected_structure = errorData.detail.details.expected_structure;
           console.error('Invalid input structure:', expected_structure);
           setExpectedStructure(expected_structure);
+          setErrorMessage(errorData.detail.details.message); // Set error message
         }
 
-        throw new Error(errorData.detail || 'Error generating proof');
+        return errorData.detail || 'Error generating proof';
       }
 
       const data = await response.json();
@@ -85,7 +90,25 @@ function App() {
       if (error.detail && error.detail.details.expected_structure) {
         setExpectedStructure(error.detail.details.expected_structure);
       }
+      setErrorMessage(error.detail.message); // Set error message
       return 'Error generating proof';
+    }
+  }
+
+  async function fetchInputExample(modelName) {
+    try {
+      const response = await fetch(`http://localhost:8000/input-example?model_name=${modelName}`);
+      if (!response.ok) {
+        const errorDetails = await response.json();
+        throw new Error(`Error: ${errorDetails.detail}`);
+      }
+
+      const data = await response.json();
+      console.log("data", data);
+      setExpectedStructure(data)
+      console.log('Input Example:', data);
+    } catch (error) {
+      console.error('Failed to fetch input example:', error);
     }
   }
 
@@ -104,17 +127,14 @@ function App() {
     setVerifyDisabled(true);
     setExpectedStructure(null);
 
-    console.log("inputData", inputData);
-
     const normalizedInputData = normalizeInputData(inputData);
     const proof = await generateProof(normalizedInputData, selectedModel);
     console.log('Proof generated:', proof);
 
-    setTimeout(() => {
-      setLoading(false);
-      setVerifyDisabled(false);
-      console.log(`Model: ${selectedModel}, Input: ${inputData}`);
-    }, 5000);
+    setOutput(proof.pretty_public_inputs.rescaled_outputs);
+    setLoading(false);
+    setVerifyDisabled(false);
+    console.log(`Model: ${selectedModel}, Input: ${inputData}`);
   };
 
   const handleVerify = () => {
@@ -130,7 +150,7 @@ function App() {
   return (
       <div
           className="App min-h-screen bg-cover bg-center flex flex-col items-center justify-center p-4"
-          style={{ backgroundImage: "url('https://source.unsplash.com/1600x900/?ai,technology')" }}
+          style={ { backgroundImage: "url('https://source.unsplash.com/1600x900/?ai,technology')" } }
       >
         <h1 className="text-4xl font-bold text-white mb-6">Select Model and Input Data</h1>
         <div className="mb-4 w-full max-w-md">
@@ -140,18 +160,18 @@ function App() {
           >Select Model:</label>
           <select
               id="model-selector"
-              value={selectedModel}
-              onChange={handleModelChange}
+              value={ selectedModel }
+              onChange={ handleModelChange }
               className="block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
           >
-            {models.map((model) => (
+            { models.map((model) => (
                 <option
-                    key={model}
-                    value={model}
+                    key={ model }
+                    value={ model }
                 >
-                  {model}
+                  { model }
                 </option>
-            ))}
+            )) }
           </select>
         </div>
         <div className="mb-4 w-full max-w-md">
@@ -160,19 +180,22 @@ function App() {
               className="block text-lg font-medium text-white mb-2"
           >Input Data:</label>
           <textarea
-            id="model-input"
-            value={inputData}
-            onChange={handleInputChange}
-            className="block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-            rows="10"
+              id="model-input"
+              value={ inputData }
+              onChange={ handleInputChange }
+              className="block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              rows="10"
           />
+          { errorMessage && (
+              <p className="text-red-500 mt-2">{ errorMessage }</p>
+          ) }
         </div>
         <button
-            onClick={handleSubmit}
+            onClick={ handleSubmit }
             className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-md shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-            disabled={loading}
+            disabled={ loading }
         >
-          {loading ? (
+          { loading ? (
               <svg
                   className="animate-spin h-5 w-5 text-white"
                   xmlns="http://www.w3.org/2000/svg"
@@ -195,20 +218,20 @@ function App() {
               </svg>
           ) : (
               'Submit'
-          )}
+          ) }
         </button>
         <button
-            onClick={handleVerify}
-            className={classNames(
+            onClick={ handleVerify }
+            className={ classNames(
                 "mt-4 px-6 py-3 font-semibold rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2",
                 {
                   "bg-green-600 text-white hover:bg-green-700 focus:ring-green-500": !verifyDisabled,
                   "bg-gray-400 text-gray-700 cursor-not-allowed": verifyDisabled,
                 }
-            )}
-            disabled={verifyDisabled || verifyLoading}
+            ) }
+            disabled={ verifyDisabled || verifyLoading }
         >
-          {verifyLoading ? (
+          { verifyLoading ? (
               <svg
                   className="animate-spin h-5 w-5 text-white"
                   xmlns="http://www.w3.org/2000/svg"
@@ -231,27 +254,31 @@ function App() {
               </svg>
           ) : (
               'Verify Proof'
-          )}
+          ) }
         </button>
+        { output && (
+            <div className="mt-4 p-6 bg-gray-800 rounded-md w-full max-w-3xl">
+              <h3 className="text-xl font-semibold text-white mb-4">Output:</h3>
+              <SyntaxHighlighter language="json" style={dark} className="rounded-md overflow-x-auto">
+                { JSON.stringify(output, null, 2) }
+              </SyntaxHighlighter>
+            </div>
+        ) }
         <div className="mt-6 text-white flex flex-col items-center space-y-4">
-          <div className="flex items-center space-x-2">
-            <FaCogs className="text-2xl" />
-            <h2 className="text-2xl font-semibold">Selected Model: {selectedModel}</h2>
-          </div>
-          {verify && (
+          { verify && (
               <div className="flex items-center space-x-2">
                 <FaCheckCircle className="text-2xl" />
-                <h2 className="text-2xl font-semibold">Proof: {proof}</h2>
+                <h2 className="text-2xl font-semibold">Proof: { proof }</h2>
               </div>
-          )}
-          {expectedStructure && (
-              <div className="mt-4 p-4 bg-gray-800 rounded-md">
-                <h3 className="text-xl font-semibold">Expected Structure:</h3>
-                <pre className="bg-gray-900 p-2 rounded-md overflow-x-auto">
-              {JSON.stringify(expectedStructure, null, 2)}
-            </pre>
-              </div>
-          )}
+          ) }
+          { expectedStructure && (
+            <div className="mt-4 p-6 bg-gray-800 rounded-md w-full max-w-3xl">
+              <h3 className="text-xl font-semibold text-white mb-4">Expected Structure:</h3>
+              <SyntaxHighlighter language="javascript" style={dark} className="rounded-md overflow-x-auto">
+                { JSON.stringify(expectedStructure, null, 2) }
+              </SyntaxHighlighter>
+            </div>
+          ) }
         </div>
       </div>
   );
